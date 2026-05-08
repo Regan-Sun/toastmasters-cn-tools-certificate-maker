@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>头马奖状制作工具</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">TOASTMASTERS DISTRICT 118</p>
+          <h1>奖状制作工具</h1>
+        </div>
+        <div class="template-state" id="templateState">模板加载中</div>
+      </header>
+
+      <main class="workspace">
+        <section class="panel intro-panel" aria-labelledby="basicTitle">
+          <div class="section-title">
+            <h2 id="basicTitle">基本信息</h2>
+          </div>
+
+          <div class="field-grid">
+            <label class="field">
+              <span>会议经理</span>
+              <input id="meetingManager" type="text" autocomplete="name" placeholder="请输入会议经理姓名" />
+            </label>
+
+            <label class="field">
+              <span>会长</span>
+              <input id="president" type="text" autocomplete="name" placeholder="请输入会长姓名" />
+            </label>
+
+            <label class="field">
+              <span>证书日期</span>
+              <input id="certDate" type="date" required />
+            </label>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="templateTextTitle">
+          <div class="section-title">
+            <h2 id="templateTextTitle">模板文字</h2>
+          </div>
+
+          <div class="field-grid">
+            <label class="field">
+              <span>顶部标题</span>
+              <input id="certTitle" type="text" placeholder="Division X" />
+            </label>
+
+            <label class="field">
+              <span>颁发文案</span>
+              <input id="presentedText" type="text" placeholder="Presented to" />
+            </label>
+
+            <label class="field wide-field">
+              <span>说明文字</span>
+              <input id="descriptionText" type="text" placeholder="Toastmasters District 118" />
+            </label>
+
+            <label class="field">
+              <span>左侧落款标签</span>
+              <input id="managerLabel" type="text" placeholder="会议经理" />
+            </label>
+
+            <label class="field">
+              <span>日期栏下方文字</span>
+              <input id="dateLabel" type="text" placeholder="日    期" />
+            </label>
+
+            <label class="field">
+              <span>右侧落款标签</span>
+              <input id="presidentLabel" type="text" placeholder="会长" />
+            </label>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="awardTitle">
+          <div class="section-title">
+            <h2 id="awardTitle">奖项设置</h2>
+            <button class="ghost-btn compact" id="clearWinnersBtn" type="button">清空获奖人</button>
+          </div>
+
+          <div class="award-list" id="awardList"></div>
+
+          <div class="action-row">
+            <button class="secondary-btn" id="addAwardBtn" type="button">
+              <span aria-hidden="true">+</span>
+              添加奖项
+            </button>
+            <button class="primary-btn" id="generateBtn" type="button">生成奖状</button>
+          </div>
+
+          <div class="progress hidden" id="progress">
+            <div class="progress-track">
+              <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <p id="progressText">准备生成</p>
+          </div>
+        </section>
+
+        <section class="preview-section hidden" id="previewSection" aria-labelledby="previewTitle">
+          <div class="section-title preview-title">
+            <div>
+              <h2 id="previewTitle">奖状预览</h2>
+              <p id="previewCount">已生成 0 张</p>
+            </div>
+            <button class="primary-btn warm" id="downloadAllBtn" type="button">保存全部到相册</button>
+          </div>
+
+          <div class="wechat-tip hidden" id="wechatTip">
+            <strong>当前在微信中浏览</strong>
+            <span>请长按每张奖状图片保存，或从右上角菜单在浏览器中打开后批量下载。</span>
+          </div>
+
+          <div class="preview-list" id="previewList"></div>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="message-dialog" id="messageDialog">
+      <form method="dialog">
+        <h3 id="dialogTitle">提示</h3>
+        <p id="dialogMessage"></p>
+        <button class="primary-btn" value="ok">知道了</button>
+      </form>
+    </dialog>
+
+    <canvas id="certificateCanvas" width="2200" height="1528" hidden></canvas>
+    <script src="./template-data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
