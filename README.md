@@ -1,8 +1,16 @@
 # 头马奖状制作工具
 
-这是一个给 Toastmasters 俱乐部使用的在线奖状制作小工具。
+这是一个给 Toastmasters 俱乐部使用的奖状制作网页工具。
 
 如果你每次会议结束后，都要给“最佳小蜜蜂”“最佳主持人”“最佳即兴”“最佳点评人”等获奖者制作奖状，这个工具可以帮你把重复工作一次做完。
+
+## 立即使用
+
+1. [下载完整工具包（ZIP）](https://github.com/Regan-Sun/toastmasters-cn-tools-certificate-maker/archive/refs/heads/main.zip)，然后解压。
+2. 在解压后的文件夹中，用浏览器打开 `index.html`。
+3. 页面右上角显示“模板已就绪”后，填写信息并点击“生成奖状”。详细操作见[怎么使用](#怎么使用)。
+
+请将 `index.html`、`styles.css`、`app.js` 和 `template-data.js` 保留在同一文件夹中。目前本仓库没有在线演示地址。
 
 ## 它能做什么
 
