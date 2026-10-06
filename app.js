@@ -19,80 +19,99 @@ const DEFAULT_TEMPLATE_TEXTS = {
   presented: "Presented to",
   description: "Toastmasters District 118",
   managerLabel: "会议经理",
-  dateLabel: "日    期",
+  dateLabel: "日　期",
   presidentLabel: "会长",
 };
 
+/**
+ * 奖状版式参数。
+ *
+ * 字号取向：让文字在2200x1528 画布上占据更有存在感的比例，
+ * 而不是在中间挤成一条窄带。原则是「获奖人姓名是主角」——
+ * 姓名和奖项名用最大字号，说明性文字次之，落款标签最小。
+ *
+ * maxWidth 的取值不是随手写的：它同时承担两个职责——
+ * ① 防止文字压到左右装饰区；② 在 drawFittedText 里充当溢出阈值。
+ * 所以放宽字号的同时也要按比例放宽 maxWidth，否则放大不生效。
+ */
 const DISTRICT_CERT = {
   width: 2200,
   height: 1528,
   title: {
     x: 1100,
-    y: 285,
-    size: 62,
-    minSize: 44,
-    maxWidth: 620,
+    y: 268,
+    size: 78,
+    minSize: 48,
+    maxWidth: 760,
+    // 到下方奖项名的垂直间距为 172，留约 3/4 给字高
+    maxHeight: 130,
     color: "#004165",
     weight: "800",
     family: '"Arial","Helvetica Neue","PingFang SC","Noto Sans SC",sans-serif',
   },
   award: {
     x: 1100,
-    y: 480,
-    size: 84,
-    minSize: 48,
-    maxWidth: 930,
+    y: 440,
+    size: 108,
+    minSize: 56,
+    maxWidth: 1180,
+    maxHeight: 150,
     color: "#050505",
     weight: "900",
     family: '"Arial Black","Arial","Helvetica Neue","PingFang SC","Noto Sans SC",sans-serif',
   },
   presented: {
     x: 1100,
-    y: 640,
-    size: 42,
-    minSize: 30,
-    maxWidth: 520,
+    y: 610,
+    size: 54,
+    minSize: 34,
+    maxWidth: 680,
+    maxHeight: 100,
     color: "#050505",
     weight: "700",
     family: '"Arial","Helvetica Neue","PingFang SC","Noto Sans SC",sans-serif',
   },
   winner: {
     x: 1100,
-    y: 760,
-    size: 86,
-    minSize: 46,
-    maxWidth: 720,
+    y: 768,
+    size: 148,
+    minSize: 64,
+    maxWidth: 1300,
+    // 距横线908 有 140 空间，不能让它压线
+    maxHeight: 132,
     color: "#050505",
     weight: "800",
     family: '"Arial","Helvetica Neue","PingFang SC","Noto Sans SC",sans-serif',
   },
   description: {
     x: 1100,
-    y: 936,
-    size: 30,
-    minSize: 22,
-    maxWidth: 650,
+    y: 962,
+    size: 40,
+    minSize: 26,
+    maxWidth: 860,
+    // 距落款签名线 1150 有 188 空间
+    maxHeight: 80,
     color: "#050505",
     weight: "500",
     family: '"Arial","Helvetica Neue","PingFang SC","Noto Sans SC",sans-serif',
   },
   signatures: {
-    lineY: 1138,
-    nameY: 1096,
-    labelY: 1178,
-    lineWidth: 520,
+    lineY: 1150,
+    nameY: 1098,
+    labelY: 1194,
+    lineWidth: 560,
     lineWeight: 5,
-    nameSize: 44,
-    labelSize: 28,
+    nameSize: 58,
+    labelSize: 36,
     color: "#666666",
     textColor: "#4d4d4d",
     x: {
-      manager: 520,
+      manager: 500,
       date: 1100,
-      president: 1680,
+      president: 1700,
     },
   },
-  mainRule: { x: 1100, y: 900, width: 1040, weight: 5 },
+  mainRule: { x: 1100, y: 908, width: 1040, weight: 5 },
   topLogo: { x: 1828, y: 86, width: 240, height: 199 },
   districtMark: { x: 1585, y: 1265, width: 430, height: 191 },
 };
@@ -240,12 +259,23 @@ function loadTemplateTexts(savedTexts = {}) {
   els.presentedText.value = readSavedText(savedTexts.presented, DEFAULT_TEMPLATE_TEXTS.presented);
   els.descriptionText.value = readSavedText(savedTexts.description, DEFAULT_TEMPLATE_TEXTS.description);
   els.managerLabel.value = readSavedText(savedTexts.managerLabel, DEFAULT_TEMPLATE_TEXTS.managerLabel);
-  els.dateLabel.value = readSavedText(savedTexts.dateLabel, DEFAULT_TEMPLATE_TEXTS.dateLabel);
+  els.dateLabel.value = normalizeDateLabel(
+    readSavedText(savedTexts.dateLabel, DEFAULT_TEMPLATE_TEXTS.dateLabel),
+  );
   els.presidentLabel.value = readSavedText(savedTexts.presidentLabel, DEFAULT_TEMPLATE_TEXTS.presidentLabel);
 }
 
 function readSavedText(value, fallback) {
   return typeof value === "string" ? value : fallback;
+}
+
+/**
+ * 旧版本默认的日期标签是「日    期」（多个连续空格）。
+ * 字号放大后那串空格会占掉过多宽度，所以把「日+若干空白+期」
+ * 统一规范成全角空格；但如果是用户自己改过的其他文字，保持原样不动。
+ */
+function normalizeDateLabel(value) {
+  return /^日\s+期$/.test(value) ? DEFAULT_TEMPLATE_TEXTS.dateLabel : value;
 }
 
 function getTemplateTexts() {
@@ -570,7 +600,7 @@ function drawDistrictSignatures(templateTexts) {
         x: column.x,
         y: signatures.nameY,
         size: signatures.nameSize,
-        minSize: 28,
+        minSize: 32,
         maxWidth: signatures.lineWidth - 40,
         color: signatures.textColor,
         weight: "700",
@@ -581,7 +611,7 @@ function drawDistrictSignatures(templateTexts) {
       x: column.x,
       y: signatures.labelY,
       size: signatures.labelSize,
-      minSize: 28,
+      minSize: 26,
       maxWidth: signatures.lineWidth - 40,
       color: signatures.color,
       weight: "700",
@@ -597,6 +627,13 @@ function formatCertificateDate(value) {
   return `${match[1]}年${match[2]}月${match[3]}日`;
 }
 
+/**
+ * 绘制自适应文字：宽度或高度任一超出上限就逐步缩小，直到 minSize。
+ *
+ * 为什么加了高度约束：原实现只按 maxWidth 收缩。字号整体放大后，
+ * 用户若把「说明文字」改成多行长句，即使宽度勉强够，也会因为
+ * 行高过大压到下方横线或落款区。补上 maxHeight 才能真正兜住。
+ */
 function drawFittedText(text, spec, options = {}) {
   const value = String(text ?? "");
   let fontSize = spec.size;
@@ -604,10 +641,21 @@ function drawFittedText(text, spec, options = {}) {
   ctx.strokeStyle = spec.color;
   ctx.lineJoin = "round";
 
-  while (fontSize > spec.minSize) {
+  const fits = (size) => {
+    ctx.font = `${spec.weight} ${size}px ${spec.family}`;
+    const metrics = ctx.measureText(value);
+    if (metrics.width > spec.maxWidth) return false;
+    if (spec.maxHeight && metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent > spec.maxHeight) {
+      return false;
+    }
+    return true;
+  };
+
+  if (!fits(fontSize)) {
+    while (fontSize > spec.minSize && !fits(fontSize)) {
+      fontSize -= 2;
+    }
     ctx.font = `${spec.weight} ${fontSize}px ${spec.family}`;
-    if (ctx.measureText(value).width <= spec.maxWidth) break;
-    fontSize -= 2;
   }
 
   if (options.stroke) {
