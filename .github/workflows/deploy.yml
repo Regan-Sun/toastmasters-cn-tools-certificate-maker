@@ -1,0 +1,46 @@
+name: 部署到 GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # 手动触发，方便改了文案先发一次再验证
+  workflow_dispatch:
+
+# 只需要最小权限：Pages 部署需要写权限和 OIDC
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一分支连续推送时只跑最后一次，避免每次改字都排一次队
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pages 官方三件套：配置 -> 打包产物 -> 发布
+      - uses: actions/configure-pages@v5
+        id: pages
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+          # 排除不该进产物的东西：.git、CI 配置、本地临时文件
+          # 注意：.nojekyll 必须保留，否则 Jekyll 会接管这个静态站
+          # artifact-action 的 exclude 用空格分隔，且不带前导 ./
+          exclude: |
+            .git
+            .github
+            node_modules
+            *.zip
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

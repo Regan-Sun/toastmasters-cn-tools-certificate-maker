@@ -143,6 +143,226 @@ h2 {
   margin-bottom: 14px;
 }
 
+.section-hint {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ---------- 批量导入名单 ---------- */
+
+.roster-body {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  outline: none;
+  background: var(--surface-alt);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.7;
+  resize: vertical;
+}
+
+.field textarea:focus {
+  border-color: var(--tm-blue-soft);
+  box-shadow: 0 0 0 4px rgba(0, 65, 101, 0.12);
+  background: #fff;
+}
+
+.roster-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.roster-actions.end {
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.secondary-btn.compact-wide,
+.ghost-btn.compact-wide,
+.primary-btn.compact-wide {
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.file-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  overflow: hidden;
+}
+
+.file-btn:hover {
+  border-color: var(--tm-blue-soft);
+  color: var(--tm-blue);
+}
+
+.file-btn input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.parse-report {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: #fff8e6;
+  color: #7a5312;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.parse-report:empty {
+  display: none;
+}
+
+.parse-preview {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px dashed #a9b2b1;
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+}
+
+.parse-preview .section-title {
+  margin-bottom: 0;
+}
+
+.muted-note {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.parse-list {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.parse-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.parse-index {
+  min-width: 26px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.parse-item input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  outline: none;
+  background: #fff;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.parse-item input:focus {
+  border-color: var(--tm-blue-soft);
+  box-shadow: 0 0 0 3px rgba(0, 65, 101, 0.1);
+}
+
+.parse-item input.input-warning {
+  border-color: #e0a800;
+  background: #fffbf0;
+}
+
+.icon-btn.small {
+  width: 32px;
+  height: 32px;
+  font-size: 17px;
+}
+
+/* ---------- 历史会议 ---------- */
+
+.history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+}
+
+.history-info {
+  min-width: 0;
+}
+
+.history-info strong,
+.history-info span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-info strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.history-info span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* ---------- 预览区按钮组 ---------- */
+
+.preview-buttons {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
 .field-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -508,5 +728,36 @@ h2 {
 
   .certificate-actions {
     justify-content: space-between;
+  }
+
+  .preview-buttons {
+    width: 100%;
+  }
+
+  .preview-buttons .primary-btn,
+  .preview-buttons .ghost-btn {
+    flex: 1;
+  }
+
+  .parse-item {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  /* 移动端把获奖人输入框换到第二行，避免三个控件挤在一行点不准 */
+  .parse-item input:nth-of-type(2) {
+    grid-column: 2 / -1;
+  }
+
+  .roster-actions > * {
+    flex: 1;
+  }
+
+  .history-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .history-actions {
+    justify-content: flex-end;
   }
 }

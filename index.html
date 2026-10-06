@@ -78,6 +78,52 @@
           </div>
         </section>
 
+        <section class="panel" aria-labelledby="rosterTitle">
+          <div class="section-title">
+            <div>
+              <h2 id="rosterTitle">批量导入名单</h2>
+              <p class="section-hint">从微信、表格或备忘录复制过来，整段粘贴即可</p>
+            </div>
+            <button class="ghost-btn compact" id="toggleRosterBtn" type="button" aria-expanded="false" aria-controls="rosterBody">
+              展开
+            </button>
+          </div>
+
+          <div class="roster-body hidden" id="rosterBody">
+            <label class="field">
+              <span>粘贴名单</span>
+              <textarea
+                id="rosterInput"
+                rows="6"
+                placeholder="每行一条，支持以下写法：&#10;最佳主持人：小王&#10;最佳即兴:李四&#10;最佳点评人&#9;张三&#10;1. 最佳小蜜蜂 王五"
+              ></textarea>
+            </label>
+
+            <div class="roster-actions">
+              <button class="secondary-btn compact-wide" id="parseRosterBtn" type="button">解析名单</button>
+              <button class="ghost-btn compact-wide" id="readClipboardBtn" type="button">读取剪贴板</button>
+              <label class="file-btn">
+                选择文件
+                <input id="rosterFile" type="file" accept=".txt,.csv,.tsv,text/plain,text/csv" />
+              </label>
+            </div>
+
+            <div class="parse-report hidden" id="parseReport"></div>
+
+            <div class="parse-preview hidden" id="parsePreview">
+              <div class="section-title">
+                <strong>解析结果预览</strong>
+                <span class="muted-note" id="parseSummary"></span>
+              </div>
+              <div class="parse-list" id="parseList"></div>
+              <div class="roster-actions end">
+                <button class="ghost-btn compact-wide" id="cancelParseBtn" type="button">取消</button>
+                <button class="primary-btn compact-wide" id="applyRosterBtn" type="button">应用并替换当前列表</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="panel" aria-labelledby="awardTitle">
           <div class="section-title">
             <h2 id="awardTitle">奖项设置</h2>
@@ -102,13 +148,27 @@
           </div>
         </section>
 
+        <section class="panel hidden" aria-labelledby="historyTitle" id="historyPanel">
+          <div class="section-title">
+            <div>
+              <h2 id="historyTitle">历史会议</h2>
+              <p class="section-hint">载入往期会议：奖项设置一并带入，只需改人名</p>
+            </div>
+            <button class="ghost-btn compact" id="clearHistoryBtn" type="button">清空历史</button>
+          </div>
+          <div class="history-list" id="historyList"></div>
+        </section>
+
         <section class="preview-section hidden" id="previewSection" aria-labelledby="previewTitle">
           <div class="section-title preview-title">
             <div>
               <h2 id="previewTitle">奖状预览</h2>
               <p id="previewCount">已生成 0 张</p>
             </div>
-            <button class="primary-btn warm" id="downloadAllBtn" type="button">保存全部到相册</button>
+            <div class="preview-buttons">
+              <button class="ghost-btn compact" id="saveFolderBtn" type="button">存到文件夹</button>
+              <button class="primary-btn warm" id="downloadAllBtn" type="button">打包下载 ZIP</button>
+            </div>
           </div>
 
           <div class="wechat-tip hidden" id="wechatTip">
@@ -131,6 +191,8 @@
 
     <canvas id="certificateCanvas" width="2200" height="1528" hidden></canvas>
     <script src="./template-data.js"></script>
+    <script src="./zip.js"></script>
+    <script src="./roster.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

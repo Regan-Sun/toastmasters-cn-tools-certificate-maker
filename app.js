@@ -3,6 +3,8 @@
 const TOP_LOGO_SRC = window.TM_GLOBE_LOGO_DATA_URL || "";
 const DISTRICT_MARK_SRC = window.TM_DISTRICT_118_DATA_URL || "";
 const STORAGE_KEY = "tm_certificate_maker_state_v1";
+const HISTORY_KEY = "tm_certificate_maker_history_v1";
+const HISTORY_LIMIT = 20;
 const DEFAULT_AWARDS = [
   "最佳小蜜蜂",
   "最佳主持人",
@@ -98,6 +100,8 @@ const DISTRICT_CERT = {
 const state = {
   awards: DEFAULT_AWARDS.map((award) => ({ award, winner: "" })),
   certificates: [],
+  history: [],
+  pendingRows: [],
 };
 
 const topLogoImage = new Image();
@@ -126,7 +130,23 @@ const els = {
   previewCount: document.querySelector("#previewCount"),
   previewList: document.querySelector("#previewList"),
   downloadAllBtn: document.querySelector("#downloadAllBtn"),
+  saveFolderBtn: document.querySelector("#saveFolderBtn"),
   wechatTip: document.querySelector("#wechatTip"),
+  toggleRosterBtn: document.querySelector("#toggleRosterBtn"),
+  rosterBody: document.querySelector("#rosterBody"),
+  rosterInput: document.querySelector("#rosterInput"),
+  parseRosterBtn: document.querySelector("#parseRosterBtn"),
+  readClipboardBtn: document.querySelector("#readClipboardBtn"),
+  rosterFile: document.querySelector("#rosterFile"),
+  parseReport: document.querySelector("#parseReport"),
+  parsePreview: document.querySelector("#parsePreview"),
+  parseList: document.querySelector("#parseList"),
+  parseSummary: document.querySelector("#parseSummary"),
+  applyRosterBtn: document.querySelector("#applyRosterBtn"),
+  cancelParseBtn: document.querySelector("#cancelParseBtn"),
+  historyPanel: document.querySelector("#historyPanel"),
+  historyList: document.querySelector("#historyList"),
+  clearHistoryBtn: document.querySelector("#clearHistoryBtn"),
   dialog: document.querySelector("#messageDialog"),
   dialogTitle: document.querySelector("#dialogTitle"),
   dialogMessage: document.querySelector("#dialogMessage"),
@@ -154,7 +174,9 @@ function init() {
   }
 
   loadSavedState();
+  loadHistory();
   renderAwards();
+  renderHistory();
   syncWechatMode();
 
   els.meetingManager.addEventListener("input", saveState);
@@ -167,6 +189,15 @@ function init() {
   els.clearWinnersBtn.addEventListener("click", clearWinners);
   els.generateBtn.addEventListener("click", generateCertificates);
   els.downloadAllBtn.addEventListener("click", downloadAll);
+  els.saveFolderBtn.addEventListener("click", saveToFolder);
+
+  els.toggleRosterBtn.addEventListener("click", toggleRosterPanel);
+  els.parseRosterBtn.addEventListener("click", () => handleRosterText(els.rosterInput.value));
+  els.readClipboardBtn.addEventListener("click", readClipboardRoster);
+  els.rosterFile.addEventListener("change", handleRosterFile);
+  els.applyRosterBtn.addEventListener("click", applyPendingRows);
+  els.cancelParseBtn.addEventListener("click", cancelPendingRows);
+  els.clearHistoryBtn.addEventListener("click", clearHistory);
 }
 
 function loadSavedState() {
@@ -257,6 +288,7 @@ function renderAwards() {
       (value) => {
         state.awards[index].award = value;
         saveState();
+        invalidateCertificates();
       },
       `award-name-${index}`,
     );
@@ -268,6 +300,7 @@ function renderAwards() {
       (value) => {
         state.awards[index].winner = value;
         saveState();
+        invalidateCertificates();
       },
       `winner-name-${index}`,
     );
@@ -283,6 +316,7 @@ function renderAwards() {
       state.awards.splice(index, 1);
       saveState();
       renderAwards();
+      invalidateCertificates();
     });
 
     row.append(badge, awardField, winnerField, deleteBtn);
@@ -312,6 +346,7 @@ function addAward() {
   state.awards.push({ award: "", winner: "" });
   saveState();
   renderAwards();
+  invalidateCertificates();
   const lastInput = els.awardList.querySelector(".award-item:last-child input");
   lastInput?.focus();
 }
@@ -357,6 +392,7 @@ async function generateCertificates() {
   setProgress(state.awards.length, state.awards.length, "生成完成");
   renderPreviews();
   saveState();
+  archiveCurrentMeeting();
   els.previewSection.classList.remove("hidden");
   els.previewSection.scrollIntoView({ behavior: "smooth", block: "start" });
 
@@ -641,29 +677,121 @@ function downloadOne(index) {
   renderPreviews();
 }
 
+/**
+ * 打包下载：把所有奖状打成一个 ZIP。
+ *
+ * 为什么不逐张下载：原实现靠 setTimeout 逐个触发浏览器下载，
+ * 一次会议 6 张就是 6 次下载弹窗，Safari/微信下经常只落地前几张。
+ * PNG 本身已压缩，用 store 模式打包体积几乎不变，但只下载一次。
+ */
 async function downloadAll() {
-  if (isWechat()) return;
+  if (isWechat() || state.certificates.length === 0) return;
+
   els.downloadAllBtn.disabled = true;
-  els.downloadAllBtn.textContent = "保存中...";
+  els.downloadAllBtn.textContent = "打包中...";
 
-  for (let index = 0; index < state.certificates.length; index += 1) {
-    if (!state.certificates[index].saved) {
-      downloadOne(index);
-      await delay(260);
-    }
+  try {
+    const files = state.certificates.map((certificate) => ({
+      name: buildFileName(certificate),
+      dataUrl: certificate.dataUrl,
+    }));
+    const blob = window.TMCertificateZip.createZip(files);
+    downloadBlob(blob, buildZipFileName());
+    state.certificates.forEach((certificate) => {
+      certificate.saved = true;
+    });
+    renderPreviews();
+  } catch (error) {
+    showMessage("打包失败", `没能生成压缩包：${error.message || "未知错误"}。可以改用「存到文件夹」或单张保存。`);
+  } finally {
+    els.downloadAllBtn.disabled = false;
+    els.downloadAllBtn.textContent = "打包下载 ZIP";
   }
-
-  els.downloadAllBtn.disabled = false;
-  els.downloadAllBtn.textContent = "保存全部到相册";
 }
 
-function downloadDataUrl(dataUrl, fileName) {
+/**
+ * 存到指定文件夹：Chrome/Edge 支持 File System Access API，
+ * 一次选定目录后所有奖状直接落盘，不再经过下载栏。
+ */
+async function saveToFolder() {
+  if (state.certificates.length === 0) return;
+
+  if (typeof window.showDirectoryPicker !== "function") {
+    showMessage(
+      "当前浏览器不支持",
+      "直接存文件夹需要 Chrome 或 Edge。其他浏览器请用「打包下载 ZIP」。",
+    );
+    return;
+  }
+
+  els.saveFolderBtn.disabled = true;
+  const originalText = els.saveFolderBtn.textContent;
+  els.saveFolderBtn.textContent = "选择文件夹...";
+
+  try {
+    const directory = await window.showDirectoryPicker({ mode: "readwrite" });
+    for (let index = 0; index < state.certificates.length; index += 1) {
+      const certificate = state.certificates[index];
+      if (certificate.saved) continue;
+      const blob = dataUrlToBlob(certificate.dataUrl);
+      const fileHandle = await directory.getFileHandle(buildFileName(certificate), {
+        create: true,
+      });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      certificate.saved = true;
+      els.saveFolderBtn.textContent = `已保存 ${index + 1}/${state.certificates.length}`;
+      await nextFrame();
+    }
+    renderPreviews();
+  } catch (error) {
+    if (error && error.name === "AbortError") {
+      showMessage("已取消", "没有选择文件夹，奖状没有被保存。");
+    } else {
+      showMessage("保存失败", `写入文件夹时出错：${error.message || "未知错误"}。可以改用「打包下载 ZIP」。`);
+    }
+  } finally {
+    els.saveFolderBtn.disabled = false;
+    els.saveFolderBtn.textContent = originalText;
+  }
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [header, base64] = String(dataUrl).split(",");
+  const mimeMatch = header.match(/data:([^;]+)/);
+  const mime = mimeMatch ? mimeMatch[1] : "image/png";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: mime });
+}
+
+function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
-  anchor.href = dataUrl;
+  anchor.href = url;
   anchor.download = fileName;
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
+  // 立即 revoke 会让部分浏览器来不及取数据，延后释放
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function downloadDataUrl(dataUrl, fileName) {
+  downloadBlob(dataUrlToBlob(dataUrl), fileName);
+}
+
+/** ZIP 包名：日期 + 会议经理，便于在下载栏里区分多场会议。 */
+function buildZipFileName() {
+  const manager = els.meetingManager.value.trim();
+  const date = els.certDate.value || new Date().toISOString().slice(0, 10);
+  const parts = [`奖状_${date}`];
+  if (manager) parts.push(cleanFileSegment(manager));
+  return `${parts.join("_")}.zip`;
 }
 
 function buildFileName(certificate) {
@@ -687,6 +815,8 @@ function syncWechatMode() {
   const wechat = isWechat();
   els.wechatTip.classList.toggle("hidden", !wechat);
   els.downloadAllBtn.classList.toggle("hidden", wechat);
+  // 微信内置浏览器没有 File System Access API，隐藏免得点了没反应
+  els.saveFolderBtn.classList.toggle("hidden", wechat);
 }
 
 function showMessage(title, message) {
@@ -704,10 +834,6 @@ function isWechat() {
   return /MicroMessenger/i.test(navigator.userAgent);
 }
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function nextFrame() {
   return new Promise((resolve) => requestAnimationFrame(resolve));
 }
@@ -721,6 +847,311 @@ function updateTemplateState() {
 
 function allTemplateAssetsReady() {
   return requiredImages.every((image) => image.complete && image.naturalWidth > 0);
+}
+
+/* ==================== 批量导入名单 ==================== */
+
+function toggleRosterPanel() {
+  const collapsed = els.rosterBody.classList.toggle("hidden");
+  els.toggleRosterBtn.textContent = collapsed ? "展开" : "收起";
+  els.toggleRosterBtn.setAttribute("aria-expanded", String(!collapsed));
+}
+
+function handleRosterText(text) {
+  const source = String(text ?? "").trim();
+  if (!source) {
+    showMessage("没有内容", "请先粘贴名单，或者点「读取剪贴板」。");
+    return;
+  }
+
+  const { rows, skipped } = window.TMRosterParser.parseRoster(source);
+
+  if (rows.length === 0) {
+    showMessage(
+      "没能识别出奖项",
+      `读到了 ${source.split(/\r?\n/).filter(Boolean).length} 行，但没有一行能拆成「奖项 + 获奖人」。\n建议每行写成：最佳主持人：小王`,
+    );
+    return;
+  }
+
+  state.pendingRows = rows;
+  renderParsePreview(rows, skipped);
+}
+
+async function readClipboardRoster() {
+  if (!navigator.clipboard || !navigator.clipboard.readText) {
+    showMessage("无法读取剪贴板", "浏览器不允许直接读取剪贴板，请手动粘贴到输入框。");
+    return;
+  }
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text.trim()) {
+      showMessage("剪贴板是空的", "先复制名单，再回来点这里。");
+      return;
+    }
+    els.rosterInput.value = text;
+    handleRosterText(text);
+  } catch {
+    showMessage("读取剪贴板失败", "可能是浏览器权限限制，请手动粘贴到输入框。");
+  }
+}
+
+function handleRosterFile(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const text = String(reader.result || "");
+    els.rosterInput.value = text;
+    handleRosterText(text);
+    // 允许重复选择同一个文件
+    event.target.value = "";
+  };
+  reader.onerror = () => showMessage("读取文件失败", "请确认文件是纯文本或 CSV 格式。");
+  reader.readAsText(file, "UTF-8");
+}
+
+function renderParsePreview(rows, skipped) {
+  els.parseReport.classList.remove("hidden");
+  els.parseList.replaceChildren();
+  els.parseSummary.textContent = `识别 ${rows.length} 条${
+    skipped.length ? ` · 跳过 ${skipped.length} 行` : ""
+  }`;
+
+  rows.forEach((row, index) => {
+    const item = document.createElement("div");
+    item.className = "parse-item";
+
+    const indexTag = document.createElement("span");
+    indexTag.className = "parse-index";
+    indexTag.textContent = String(index + 1);
+
+    const awardInput = document.createElement("input");
+    awardInput.type = "text";
+    awardInput.value = row.award;
+    awardInput.placeholder = "奖项名称";
+    awardInput.className = row.award ? "" : "input-warning";
+    awardInput.addEventListener("input", () => {
+      row.award = awardInput.value;
+    });
+
+    const winnerInput = document.createElement("input");
+    winnerInput.type = "text";
+    winnerInput.value = row.winner;
+    winnerInput.placeholder = "获奖人";
+    winnerInput.addEventListener("input", () => {
+      row.winner = winnerInput.value;
+    });
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "icon-btn small";
+    removeBtn.type = "button";
+    removeBtn.title = "移除这一条";
+    removeBtn.setAttribute("aria-label", `移除第 ${index + 1} 条`);
+    removeBtn.textContent = "×";
+    removeBtn.addEventListener("click", () => {
+      const indexInState = state.pendingRows.indexOf(row);
+      if (indexInState > -1) state.pendingRows.splice(indexInState, 1);
+      renderParsePreview(state.pendingRows, skipped);
+      if (state.pendingRows.length === 0) cancelPendingRows();
+    });
+
+    item.append(indexTag, awardInput, winnerInput, removeBtn);
+    els.parseList.append(item);
+  });
+
+  const missing = rows.filter((row) => !row.award.trim() || !row.winner.trim()).length;
+  if (missing > 0) {
+    els.parseReport.textContent = `有 ${missing} 条缺奖项名或获奖人，已用黄色标出，请补齐后再应用。`;
+  } else if (skipped.length > 0) {
+    els.parseReport.textContent = `以下 ${skipped.length} 行没能识别，已跳过：${skipped
+      .slice(0, 3)
+      .join("；")}${skipped.length > 3 ? "…" : ""}`;
+  } else {
+    els.parseReport.textContent = "";
+  }
+
+  els.parsePreview.classList.remove("hidden");
+  els.parsePreview.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function cancelPendingRows() {
+  state.pendingRows = [];
+  els.parsePreview.classList.add("hidden");
+  els.parseReport.classList.add("hidden");
+  els.parseList.replaceChildren();
+}
+
+function applyPendingRows() {
+  const rows = state.pendingRows
+    .map((row) => ({ award: row.award.trim(), winner: row.winner.trim() }))
+    .filter((row) => row.award && row.winner);
+
+  if (rows.length === 0) {
+    showMessage("还不能应用", "请至少填好一条完整的「奖项 + 获奖人」。");
+    return;
+  }
+
+  const incomplete = state.pendingRows.length - rows.length;
+  state.awards = rows;
+  saveState();
+  renderAwards();
+  cancelPendingRows();
+
+  // 名单变了，之前生成的预览已失效
+  invalidateCertificates();
+
+  if (incomplete > 0) {
+    showMessage(
+      "已应用",
+      `导入 ${rows.length} 条；${incomplete} 条因信息不全被跳过。缺失的那几条没有写入。`,
+    );
+  }
+}
+
+/** 名单或模板改动后，已生成的奖状不再可信，清掉预览避免误用旧图。 */
+function invalidateCertificates() {
+  if (state.certificates.length === 0) return;
+  state.certificates = [];
+  els.previewSection.classList.add("hidden");
+  els.previewList.replaceChildren();
+}
+
+/* ==================== 历史会议记录 ==================== */
+
+function loadHistory() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    state.history = Array.isArray(saved) ? saved.filter(isValidHistoryItem) : [];
+  } catch {
+    localStorage.removeItem(HISTORY_KEY);
+    state.history = [];
+  }
+}
+
+function isValidHistoryItem(item) {
+  return (
+    item && typeof item === "object" && Array.isArray(item.awards) && typeof item.savedAt === "string"
+  );
+}
+
+function saveHistory() {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(state.history));
+  } catch {
+    // 配额满或隐私模式，静默失败但不影响主流程
+  }
+}
+
+/** 生成成功后归档一条。同一天同一批奖项不重复记录。 */
+function archiveCurrentMeeting() {
+  const signature = JSON.stringify(
+    state.awards.map((item) => `${item.award.trim()}|${item.winner.trim()}`),
+  );
+  const deduped = state.history.filter((item) => item.signature !== signature);
+  deduped.unshift({
+    signature,
+    savedAt: new Date().toISOString(),
+    date: els.certDate.value || "",
+    meetingManager: els.meetingManager.value.trim(),
+    president: els.president.value.trim(),
+    awards: state.awards.map((item) => ({
+      award: item.award.trim(),
+      winner: item.winner.trim(),
+    })),
+  });
+  state.history = deduped.slice(0, HISTORY_LIMIT);
+  saveHistory();
+  renderHistory();
+}
+
+function renderHistory() {
+  if (state.history.length === 0) {
+    els.historyPanel.classList.add("hidden");
+    return;
+  }
+
+  els.historyPanel.classList.remove("hidden");
+  els.historyList.replaceChildren();
+
+  state.history.forEach((item, index) => {
+    const card = document.createElement("article");
+    card.className = "history-item";
+
+    const info = document.createElement("div");
+    info.className = "history-info";
+
+    const title = document.createElement("strong");
+    const count = item.awards.length;
+    title.textContent = `${formatHistoryDate(item.savedAt)} · ${count} 个奖项${
+      item.meetingManager ? ` · ${item.meetingManager}` : ""
+    }`;
+
+    const detail = document.createElement("span");
+    detail.textContent = item.awards.map((row) => row.award).join("、");
+
+    info.append(title, detail);
+
+    const actions = document.createElement("div");
+    actions.className = "history-actions";
+
+    const loadBtn = document.createElement("button");
+    loadBtn.className = "save-one-btn";
+    loadBtn.type = "button";
+    loadBtn.textContent = "载入";
+    loadBtn.title = "载入这次会议的奖项和人名";
+    loadBtn.addEventListener("click", () => loadHistoryItem(index));
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "icon-btn small";
+    removeBtn.type = "button";
+    removeBtn.textContent = "×";
+    removeBtn.title = "删除这条记录";
+    removeBtn.setAttribute("aria-label", `删除 ${title.textContent}`);
+    removeBtn.addEventListener("click", () => removeHistoryItem(index));
+
+    actions.append(loadBtn, removeBtn);
+    card.append(info, actions);
+    els.historyList.append(card);
+  });
+}
+
+function loadHistoryItem(index) {
+  const item = state.history[index];
+  if (!item) return;
+
+  state.awards = item.awards.map((row) => ({ ...row }));
+  if (item.date) els.certDate.value = item.date;
+  if (item.meetingManager) els.meetingManager.value = item.meetingManager;
+  if (item.president) els.president.value = item.president;
+
+  saveState();
+  renderAwards();
+  invalidateCertificates();
+  els.awardList.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function removeHistoryItem(index) {
+  state.history.splice(index, 1);
+  saveHistory();
+  renderHistory();
+}
+
+function clearHistory() {
+  if (state.history.length === 0) return;
+  state.history = [];
+  saveHistory();
+  renderHistory();
+}
+
+function formatHistoryDate(isoString) {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return "未知时间";
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`;
 }
 
 init();
